@@ -649,11 +649,15 @@ class Hunyuan3DDiTPipeline:
                     step_idx = i // getattr(self.scheduler, "order", 1)
                     callback(step_idx, t, outputs)
 
-        return self._export(
+        output = self._export(
             latents,
             output_type,
             box_v, mc_level, num_chunks, octree_resolution, mc_algo,
         )
+        self.maybe_free_model_hooks()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        return output
 
     def _export(
         self,
@@ -775,9 +779,13 @@ class Hunyuan3DDiTFlowMatchingPipeline(Hunyuan3DDiTPipeline):
                     step_idx = i // getattr(self.scheduler, "order", 1)
                     callback(step_idx, t, outputs)
 
-        return self._export(
+        output = self._export(
             latents,
             output_type,
             box_v, mc_level, num_chunks, octree_resolution, mc_algo,
             enable_pbar=enable_pbar,
         )
+        self.maybe_free_model_hooks()
+        if self.device.type == "cuda":
+            torch.cuda.empty_cache()
+        return output

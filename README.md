@@ -137,6 +137,9 @@ python3 gradio_app.py \
   --low_vram_mode
 ```
 
+The shape pipelines automatically free GPU memory after each run when using CUDA,
+releasing VRAM for subsequent tasks.
+
 
 ## 🔗 BibTeX
 
