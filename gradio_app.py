@@ -35,6 +35,7 @@ import subprocess
 import time
 from glob import glob
 from pathlib import Path
+import zipfile
 
 import gradio as gr
 import torch
@@ -168,6 +169,29 @@ def export_mesh(mesh, save_folder, textured=False, type='glb'):
         else:
             mesh.export(path, include_normals=textured)
     return path
+
+
+def package_obj_assets(obj_path: str) -> str:
+    """Package OBJ along with its MTL and texture images into a zip file.
+
+    Args:
+        obj_path: Path to the exported OBJ file.
+
+    Returns:
+        str: Path to the created zip archive.
+    """
+    base_dir = os.path.dirname(obj_path)
+    base_name = os.path.splitext(os.path.basename(obj_path))[0]
+    zip_path = os.path.join(base_dir, f"{base_name}.zip")
+
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        for fname in os.listdir(base_dir):
+            full_path = os.path.join(base_dir, fname)
+            if os.path.isdir(full_path) or fname == os.path.basename(zip_path):
+                continue
+            zf.write(full_path, arcname=fname)
+
+    return zip_path
 
 
 
@@ -699,6 +723,7 @@ Fast for very complex cases, Standard seldom use.',
                 mesh = trimesh.load(file_out2)
                 save_folder = gen_save_folder()
                 path = export_mesh(mesh, save_folder, textured=True, type=file_type)
+                download_path = package_obj_assets(path) if file_type == 'obj' else path
 
                 # for preview
                 save_folder = gen_save_folder()
@@ -715,6 +740,7 @@ Fast for very complex cases, Standard seldom use.',
                     mesh = face_reduce_worker(mesh, target_face_num)
                 save_folder = gen_save_folder()
                 path = export_mesh(mesh, save_folder, textured=False, type=file_type)
+                download_path = package_obj_assets(path) if file_type == 'obj' else path
 
                 # for preview
                 save_folder = gen_save_folder()
@@ -724,7 +750,7 @@ Fast for very complex cases, Standard seldom use.',
                                                             width=HTML_WIDTH,
                                                             textured=False)
             print(f'export to {path}')
-            return model_viewer_html, gr.update(value=path, interactive=True)
+            return model_viewer_html, gr.update(value=download_path, interactive=True)
 
         confirm_export.click(
             lambda: gr.update(selected='export_mesh_panel'),
