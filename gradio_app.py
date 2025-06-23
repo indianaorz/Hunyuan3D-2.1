@@ -158,7 +158,15 @@ def export_mesh(mesh, save_folder, textured=False, type='glb'):
     if type not in ['glb', 'obj']:
         mesh.export(path)
     else:
-        mesh.export(path, include_normals=textured)
+        if textured and type == 'obj':
+            mesh.export(
+                path,
+                include_normals=True,
+                include_color=True,
+                include_texture=True,
+            )
+        else:
+            mesh.export(path, include_normals=textured)
     return path
 
 
