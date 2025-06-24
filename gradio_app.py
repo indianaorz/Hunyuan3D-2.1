@@ -466,7 +466,7 @@ def generation_all(
             num_chunks=num_chunks,
             randomize_seed=randomize_seed,
         )
-        mesh = trimesh.load(mesh_path)
+        mesh = trimesh.load(mesh_path, force='mesh')
         stats['number_of_faces'] = mesh.faces.shape[0]
         stats['number_of_vertices'] = mesh.vertices.shape[0]
     else:
@@ -822,7 +822,7 @@ Fast for very complex cases, Standard seldom use.',
             print(f'exporting {file_out}')
             print(f'reduce face to {target_face_num}')
             if export_texture:
-                mesh = trimesh.load(file_out2)
+                mesh = trimesh.load(file_out2, force='mesh')
                 save_folder = gen_save_folder()
                 path = export_mesh(mesh, save_folder, textured=True, type=file_type)
                 download_path = package_obj_assets(path) if file_type == 'obj' else path
@@ -835,7 +835,7 @@ Fast for very complex cases, Standard seldom use.',
                                                             width=HTML_WIDTH,
                                                             textured=True)
             else:
-                mesh = trimesh.load(file_out)
+                mesh = trimesh.load(file_out, force='mesh')
                 mesh = floater_remove_worker(mesh)
                 mesh = degenerate_face_remove_worker(mesh)
                 if reduce_face:
@@ -858,7 +858,7 @@ Fast for very complex cases, Standard seldom use.',
             if file_out is None:
                 raise gr.Error('Please generate a mesh first.')
 
-            mesh = trimesh.load(file_out)
+            mesh = trimesh.load(file_out, force='mesh')
             mesh = floater_remove_worker(mesh)
             mesh = degenerate_face_remove_worker(mesh)
             if reduce_face:
