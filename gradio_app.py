@@ -721,6 +721,10 @@ Fast for very complex cases, Standard seldom use.',
             print(f'reduce face to {target_face_num}')
             if export_texture:
                 mesh = trimesh.load(file_out2)
+                mesh = floater_remove_worker(mesh)
+                mesh = degenerate_face_remove_worker(mesh)
+                if reduce_face:
+                    mesh = face_reduce_worker(mesh, target_face_num)
                 save_folder = gen_save_folder()
                 path = export_mesh(mesh, save_folder, textured=True, type=file_type)
                 download_path = package_obj_assets(path) if file_type == 'obj' else path
@@ -728,10 +732,10 @@ Fast for very complex cases, Standard seldom use.',
                 # for preview
                 save_folder = gen_save_folder()
                 _ = export_mesh(mesh, save_folder, textured=True)
-                model_viewer_html = build_model_viewer_html(save_folder, 
-                                                            height=HTML_HEIGHT, 
-                                                            width=HTML_WIDTH,
-                                                            textured=True)
+                model_viewer_html = build_model_viewer_html(save_folder,
+                                                          height=HTML_HEIGHT,
+                                                          width=HTML_WIDTH,
+                                                          textured=True)
             else:
                 mesh = trimesh.load(file_out)
                 mesh = floater_remove_worker(mesh)
