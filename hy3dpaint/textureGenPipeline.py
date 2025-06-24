@@ -90,7 +90,7 @@ class Hunyuan3DPaintPipeline:
         print("Models Loaded.")
 
     @torch.no_grad()
-    def __call__(self, mesh_path=None, image_path=None, output_mesh_path=None, use_remesh=True, save_glb=True):
+    def __call__(self, mesh_path=None, image_path=None, output_mesh_path=None, use_remesh=True, save_glb=True, target_face_num=40000):
         """Generate texture for 3D mesh using multiview diffusion"""
         # Ensure image_prompt is a list
         if isinstance(image_path, str):
@@ -106,7 +106,7 @@ class Hunyuan3DPaintPipeline:
         path = os.path.dirname(mesh_path)
         if use_remesh:
             processed_mesh_path = os.path.join(path, "white_mesh_remesh.obj")
-            remesh_mesh(mesh_path, processed_mesh_path)
+            remesh_mesh(mesh_path, processed_mesh_path, target_face_num)
         else:
             processed_mesh_path = mesh_path
 

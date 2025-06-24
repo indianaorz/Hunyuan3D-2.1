@@ -509,7 +509,7 @@ def generation_all(
     tmp_time = time.time()
 
     text_path = os.path.join(save_folder, f'textured_mesh.obj')
-    path_textured = tex_pipeline(mesh_path=path, image_path=image, output_mesh_path=text_path, save_glb=False)
+    path_textured = tex_pipeline(mesh_path=path, image_path=image, output_mesh_path=text_path, save_glb=False, target_face_num=target_face_num)
         
     logger.info("---Texture Generation takes %s seconds ---" % (time.time() - tmp_time))
     stats['time']['texture generation'] = time.time() - tmp_time
