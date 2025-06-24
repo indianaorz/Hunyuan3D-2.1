@@ -369,6 +369,7 @@ def generation_all(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    target_face_num: int = 40000,
 ):
     start_time_0 = time.time()
     mesh, image, save_folder, stats, seed = _gen_shape(
@@ -399,7 +400,7 @@ def generation_all(
     # stats['time']['postprocessing'] = time.time() - tmp_time
 
     tmp_time = time.time()
-    mesh = face_reduce_worker(mesh)
+    mesh = face_reduce_worker(mesh, target_face_num)
 
     # path = export_mesh(mesh, save_folder, textured=False, type='glb')
     path = export_mesh(mesh, save_folder, textured=False, type='obj') # 这样操作也会 core dump
@@ -680,6 +681,7 @@ Fast for very complex cases, Standard seldom use.',
                 check_box_rembg,
                 num_chunks,
                 randomize_seed,
+                target_face_num,
             ],
             outputs=[file_out, file_out2, html_gen_mesh, stats, seed]
         ).then(
@@ -721,10 +723,6 @@ Fast for very complex cases, Standard seldom use.',
             print(f'reduce face to {target_face_num}')
             if export_texture:
                 mesh = trimesh.load(file_out2)
-                mesh = floater_remove_worker(mesh)
-                mesh = degenerate_face_remove_worker(mesh)
-                if reduce_face:
-                    mesh = face_reduce_worker(mesh, target_face_num)
                 save_folder = gen_save_folder()
                 path = export_mesh(mesh, save_folder, textured=True, type=file_type)
                 download_path = package_obj_assets(path) if file_type == 'obj' else path
