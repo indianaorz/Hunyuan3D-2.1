@@ -213,6 +213,85 @@ def randomize_seed_fn(seed: int, randomize_seed: bool) -> int:
     return seed
 
 
+def _prepare_inputs(
+    caption=None,
+    image=None,
+    mv_image_front=None,
+    mv_image_back=None,
+    mv_image_left=None,
+    mv_image_right=None,
+    seed=1234,
+    octree_resolution=256,
+    check_box_rembg=False,
+    num_chunks=200000,
+    randomize_seed: bool = False,
+):
+    """Prepare inputs for texture generation without running shape generation."""
+    if not MV_MODE and image is None and caption is None:
+        raise gr.Error("Please provide either a caption or an image.")
+    if MV_MODE:
+        if mv_image_front is None and mv_image_back is None \
+            and mv_image_left is None and mv_image_right is None:
+            raise gr.Error("Please provide at least one view image.")
+        image = {}
+        if mv_image_front:
+            image['front'] = mv_image_front
+        if mv_image_back:
+            image['back'] = mv_image_back
+        if mv_image_left:
+            image['left'] = mv_image_left
+        if mv_image_right:
+            image['right'] = mv_image_right
+
+    seed = int(randomize_seed_fn(seed, randomize_seed))
+    octree_resolution = int(octree_resolution)
+    if caption:
+        print('prompt is', caption)
+
+    save_folder = gen_save_folder()
+    stats = {
+        'model': {
+            'shapegen': f'{args.model_path}/{args.subfolder}',
+            'texgen': f'{args.texgen_model_path}',
+        },
+        'params': {
+            'caption': caption,
+            'seed': seed,
+            'octree_resolution': octree_resolution,
+            'check_box_rembg': check_box_rembg,
+            'num_chunks': num_chunks,
+        }
+    }
+    time_meta = {}
+
+    if image is None:
+        start_time = time.time()
+        try:
+            image = t2i_worker(caption)
+        except Exception:
+            raise gr.Error(
+                "Text to 3D is disable. Please enable it by `python gradio_app.py --enable_t23d`."
+            )
+        time_meta['text2image'] = time.time() - start_time
+
+    if MV_MODE:
+        start_time = time.time()
+        for k, v in image.items():
+            if check_box_rembg or v.mode == "RGB":
+                img = rmbg_worker(v.convert('RGB'))
+                image[k] = img
+        time_meta['remove background'] = time.time() - start_time
+    else:
+        if check_box_rembg or image.mode == "RGB":
+            start_time = time.time()
+            image = rmbg_worker(image.convert('RGB'))
+            time_meta['remove background'] = time.time() - start_time
+
+    stats['time'] = time_meta
+    main_image = image if not MV_MODE else image['front']
+    return main_image, save_folder, stats, seed
+
+
 def build_model_viewer_html(save_folder, height=660, width=790, textured=False):
     # Remove first folder from path to make relative path
     if textured:
@@ -369,24 +448,43 @@ def generation_all(
     check_box_rembg=False,
     num_chunks=200000,
     randomize_seed: bool = False,
+    mesh_path: str | None = None,
     target_face_num: int = 40000,
 ):
     start_time_0 = time.time()
-    mesh, image, save_folder, stats, seed = _gen_shape(
-        caption,
-        image,
-        mv_image_front=mv_image_front,
-        mv_image_back=mv_image_back,
-        mv_image_left=mv_image_left,
-        mv_image_right=mv_image_right,
-        steps=steps,
-        guidance_scale=guidance_scale,
-        seed=seed,
-        octree_resolution=octree_resolution,
-        check_box_rembg=check_box_rembg,
-        num_chunks=num_chunks,
-        randomize_seed=randomize_seed,
-    )
+    if mesh_path:
+        image, save_folder, stats, seed = _prepare_inputs(
+            caption,
+            image,
+            mv_image_front=mv_image_front,
+            mv_image_back=mv_image_back,
+            mv_image_left=mv_image_left,
+            mv_image_right=mv_image_right,
+            seed=seed,
+            octree_resolution=octree_resolution,
+            check_box_rembg=check_box_rembg,
+            num_chunks=num_chunks,
+            randomize_seed=randomize_seed,
+        )
+        mesh = trimesh.load(mesh_path)
+        stats['number_of_faces'] = mesh.faces.shape[0]
+        stats['number_of_vertices'] = mesh.vertices.shape[0]
+    else:
+        mesh, image, save_folder, stats, seed = _gen_shape(
+            caption,
+            image,
+            mv_image_front=mv_image_front,
+            mv_image_back=mv_image_back,
+            mv_image_left=mv_image_left,
+            mv_image_right=mv_image_right,
+            steps=steps,
+            guidance_scale=guidance_scale,
+            seed=seed,
+            octree_resolution=octree_resolution,
+            check_box_rembg=check_box_rembg,
+            num_chunks=num_chunks,
+            randomize_seed=randomize_seed,
+        )
     path = export_mesh(mesh, save_folder, textured=False)
     
 
@@ -613,6 +711,7 @@ Fast for very complex cases, Standard seldom use.',
                                                     label='Target Face Number')
                         with gr.Row():
                             confirm_export = gr.Button(value="Transform", min_width=100)
+                            override_mesh = gr.Button(value="Override Model", min_width=100)
                             file_export = gr.DownloadButton(label="Download", variant='primary',
                                                             interactive=False, min_width=100)
 
@@ -681,6 +780,7 @@ Fast for very complex cases, Standard seldom use.',
                 check_box_rembg,
                 num_chunks,
                 randomize_seed,
+                file_out,
                 target_face_num,
             ],
             outputs=[file_out, file_out2, html_gen_mesh, stats, seed]
@@ -714,7 +814,7 @@ Fast for very complex cases, Standard seldom use.',
         decode_mode.change(on_decode_mode_change, inputs=[decode_mode], 
                            outputs=[octree_resolution])
 
-        def on_export_click(file_out, file_out2, file_type, 
+        def on_export_click(file_out, file_out2, file_type,
                             reduce_face, export_texture, target_face_num):
             if file_out is None:
                 raise gr.Error('Please generate a mesh first.')
@@ -754,6 +854,24 @@ Fast for very complex cases, Standard seldom use.',
             print(f'export to {path}')
             return model_viewer_html, gr.update(value=download_path, interactive=True)
 
+        def on_override_click(file_out, reduce_face, target_face_num):
+            if file_out is None:
+                raise gr.Error('Please generate a mesh first.')
+
+            mesh = trimesh.load(file_out)
+            mesh = floater_remove_worker(mesh)
+            mesh = degenerate_face_remove_worker(mesh)
+            if reduce_face:
+                mesh = face_reduce_worker(mesh, target_face_num)
+            save_folder = gen_save_folder()
+            path = export_mesh(mesh, save_folder, textured=False)
+            model_viewer_html = build_model_viewer_html(save_folder,
+                                                        height=HTML_HEIGHT,
+                                                        width=HTML_WIDTH,
+                                                        textured=False)
+            print(f'override with {path}')
+            return gr.update(value=path), model_viewer_html, None
+
         confirm_export.click(
             lambda: gr.update(selected='export_mesh_panel'),
             outputs=[tabs_output],
@@ -761,6 +879,12 @@ Fast for very complex cases, Standard seldom use.',
             on_export_click,
             inputs=[file_out, file_out2, file_type, reduce_face, export_texture, target_face_num],
             outputs=[html_export_mesh, file_export]
+        )
+
+        override_mesh.click(
+            on_override_click,
+            inputs=[file_out, reduce_face, target_face_num],
+            outputs=[file_out, html_gen_mesh, file_out2]
         )
 
     return demo
